@@ -279,42 +279,6 @@ public:
         return 0;
     }
 
-
-    // static void generateAndMeasure(uint8_t bitNumber)
-    // {
-    //     if (bitNumber < 4 || bitNumber > 63)
-    //     {
-    //         throw invalid_argument("Consider meaningful amount of bits");
-    //     }
-
-    //    // auto p = gen_safe_prime(bitNumber);
-    //    // auto g = generator_for_safe_prime(p);
-
-    //    // auto x =  random64(2, p - 2);
-
-    //     auto p = 305192652869879;
-    //     auto g = 11;
-
-    //     auto x =  252207972774029;
-
-    //     //cout << "data: " << p << ' ' << g << ' ' << x << endl;
-
-    //     ModuloNumber test1(1ULL << 32, p);
-
-    //     //cout << string(test1 * test1) << endl;
-
-    //     ModuloNumber X(x, p);
-    //     ModuloNumber base(g, p);
-
-    //     //cout << "Let's check out the naivep algo" << endl;
-    //     auto start = std::chrono::high_resolution_clock::now();
-    //     //uint64_t degree = log_baby_step_giant_step(x, g, p);
-    //     uint64_t degree = pollardRhoLog(X, base);
-    //     auto stop = std::chrono::high_resolution_clock::now();
-    //     cout << "And chect that it's correct " << (X == base.pow(degree)) << " " << degree << endl;
-    //     std::cout << "it took us for = " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << std::endl;
-    // }
-
 private:
     ModuloNumber operator /= (uint64_t d)
     {
@@ -376,15 +340,12 @@ private:
         }
 
         uint64_t step = a.modulo / res.second;
-        //cout << "step " << step << endl;
         auto mul = base.pow(step);
 
         for(uint64_t i = 0; i < res.second - 1; i++)
         {
             pow_ *= mul;
             degree_ += step;
-
-            //cout << "degree candidate " << degree_ << endl;
 
             if (pow_ == x)
             {
@@ -410,8 +371,6 @@ public:
         while (true)
         {
             uint64_t prime_candidate = 2 * genPrime(bit_number - 1, 20) + 1;
-
-            //std::cout << "there is a prime candiate" << endl;
 
             if (!isPocklington_prime(prime_candidate, attempts))
             {
@@ -567,7 +526,7 @@ default_random_engine PrimeRandomGenerator::generator(rd());
 class Measurer
 {
 public:
-    static void genAndMeasureDLog(uint8_t from_bits, uint8_t to_bits, uint8_t bit_step = 1 , uint64_t upper_limit = 600000, uint8_t modulosCount = 3, uint8_t xCount = 3)
+    static void genAndMeasureDLog(uint8_t from_bits, uint8_t to_bits, uint8_t bit_step = 1, uint8_t modulosCount = 3, uint8_t xCount = 3)
     {
         if (from_bits >= to_bits || from_bits < 10 || to_bits >= 63 || !bit_step)
         {
@@ -739,7 +698,7 @@ void print_a_in_x(uint64_t modulo)
 {
     if (modulo <= 2)
     {
-        cout << "please use something more meaningful than " << modulo;
+        throw underflow_error("please use something more meaningful");
     }
     uint8_t digits_count = std::to_string(modulo).length();
 
@@ -790,88 +749,12 @@ void check_Carmichael_number(uint64_t modulo)
 
 int main()
 {
-
     Measurer::genAndMeasureDLog(36, 40);
 
-    //cout << pollard_rho_log(3973579837, 7, 8227912079) << endl;
-   // uint64_t correct_degree = log_baby_step_giant_step(3973579837, 7, 8227912079);
-    //cout << "correct degree " <<  correct_degree << endl;
-   // cout << "And chect that it's correct " << (3973579837 == pow_mod(7, correct_degree, 8227912079)) << endl;
-
-    // cout <<  pollard_rho_log(5, 2, 1019) << endl;
-    // return 0;
-    //check_Carmichael_number(41041);
-
-    //ModuloNumber::generateAndMeasure(48);
-
-
-
-    // cout << generator_for_safe_prime(23) << ' ' << generator_for_safe_prime(83) << std::endl;
-     //cout << gen_prime(20) << ' ' << gen_prime(20) << endl;
-    // cout << gen_safe_prime(20) << ' ' << gen_safe_prime(20) << endl;
-    // cout << integer_pow(2, 1) << " " << integer_pow(3, 7) << " " << integer_pow(2, 10) << endl;
-    // cout << "Hello World! " << (uint16_t)integer_log(762939453125, 5) <<  endl;
-
-    // // print_a_x(17);
-     //print_a_in_x(21);
-
+    // print_a_x(17);
+    // print_a_in_x(21);
     // print_a_in_x(23);
 
-    // // uint64_t p = 17;
-
-    // // for (int i = 1; i < p; i++)
-    // // {
-    // //     cout << "degree = " << i << "|";
-    // //     for (int j = 1; j < p; j++)
-    // //     {
-    // //         cout << " " << mod_pow(j, i, p) << " |";
-    // //     }
-    // //     cout << endl;
-    // // }
-
-    // cout << "naive_mod_log(3, 5, 7) = " << naive_mod_log(3, 5, 7) << endl;
-
-    // cout << endl << endl;
-
-    // p = 10;
-
-    // for (int i = 1; i < p; i++)
-    // {
-    //     cout << "degree = " << i << "|";
-    //     for (int j = 1; j < p; j++)
-    //     {
-    //         cout << " " << mod_pow(j, i, p) << " |";
-    //     }
-    //     cout << endl;
-    // }
-
-    // 50 bits modulo
-    // uint64_t modulo = 279685449069893;
-    // uint64_t x = 39652674720629;
-    // uint64_t base = 27466379178647;
-
-    // 32 bits modulo
-    // uint64_t modulo = 2432283587;
-    // uint64_t x = 914017943;
-    // uint64_t base = 812356553;
-
-    // uint64_t modulo = 17;
-    // uint64_t x = 7;
-    // uint64_t base = 3;
-
-    // cout << "Let's check out the babu-step giant-step algo" << endl;
-    // auto start = std::chrono::high_resolution_clock::now();
-    // uint64_t degree = baby_step_giant_step_log(x, base, modulo);
-    // auto stop = std::chrono::high_resolution_clock::now();
-    // cout << "And chect that it's correct " << (x == mod_pow(base, degree, modulo)) << endl;
-    // std::cout << "it took us for = " << std::chrono::duration_cast<std::chrono::seconds>(stop - start).count() << std::endl;
-
-    // cout << "Let's try to crack on it..." << endl;
-    // auto start = std::chrono::high_resolution_clock::now();
-    // uint64_t degree = naive_mod_log(x, base, modulo);
-    // auto stop = std::chrono::high_resolution_clock::now();
-    // cout << "And chect that it's correct " << (x == mod_pow(base, degree, modulo)) << endl;
-    // std::cout << "it took us for = " << std::chrono::duration_cast<std::chrono::seconds>(stop - start).count() << std::endl;
 
     // cout << "Let's show integer_log correctness" << endl;
 

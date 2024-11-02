@@ -280,41 +280,40 @@ public:
     }
 
 
+    // static void generateAndMeasure(uint8_t bitNumber)
+    // {
+    //     if (bitNumber < 4 || bitNumber > 63)
+    //     {
+    //         throw invalid_argument("Consider meaningful amount of bits");
+    //     }
 
-    static void generateAndMeasure(uint8_t bitNumber)
-    {
-        if (bitNumber < 4 || bitNumber > 63)
-        {
-            throw invalid_argument("Consider meaningful amount of bits");
-        }
+    //    // auto p = gen_safe_prime(bitNumber);
+    //    // auto g = generator_for_safe_prime(p);
 
-       // auto p = gen_safe_prime(bitNumber);
-       // auto g = generator_for_safe_prime(p);
+    //    // auto x =  random64(2, p - 2);
 
-       // auto x =  random64(2, p - 2);
+    //     auto p = 305192652869879;
+    //     auto g = 11;
 
-        auto p = 305192652869879;
-        auto g = 11;
+    //     auto x =  252207972774029;
 
-        auto x =  252207972774029;
+    //     //cout << "data: " << p << ' ' << g << ' ' << x << endl;
 
-        cout << "data: " << p << ' ' << g << ' ' << x << endl;
+    //     ModuloNumber test1(1ULL << 32, p);
 
-        ModuloNumber test1(1ULL << 32, p);
+    //     //cout << string(test1 * test1) << endl;
 
-        cout << string(test1 * test1) << endl;
+    //     ModuloNumber X(x, p);
+    //     ModuloNumber base(g, p);
 
-        ModuloNumber X(x, p);
-        ModuloNumber base(g, p);
-
-        cout << "Let's check out the naivep algo" << endl;
-        auto start = std::chrono::high_resolution_clock::now();
-        //uint64_t degree = log_baby_step_giant_step(x, g, p);
-        uint64_t degree = pollardRhoLog(X, base);
-        auto stop = std::chrono::high_resolution_clock::now();
-        cout << "And chect that it's correct " << (X == base.pow(degree)) << " " << degree << endl;
-        std::cout << "it took us for = " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << std::endl;
-    }
+    //     //cout << "Let's check out the naivep algo" << endl;
+    //     auto start = std::chrono::high_resolution_clock::now();
+    //     //uint64_t degree = log_baby_step_giant_step(x, g, p);
+    //     uint64_t degree = pollardRhoLog(X, base);
+    //     auto stop = std::chrono::high_resolution_clock::now();
+    //     cout << "And chect that it's correct " << (X == base.pow(degree)) << " " << degree << endl;
+    //     std::cout << "it took us for = " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << std::endl;
+    // }
 
 private:
     ModuloNumber operator /= (uint64_t d)
@@ -338,11 +337,11 @@ private:
             throw invalid_argument("Consider explicit conversion here");
         }
 
-        cout << "solving " << a.val << "*x = " << b.val << " mod " << a.modulo << endl;
+        //cout << "solving " << a.val << "*x = " << b.val << " mod " << a.modulo << endl;
 
         uint64_t gcd_ = gcd(a.val, b.modulo);
 
-        cout << "gcd = " << gcd_ << endl;
+        //cout << "gcd = " << gcd_ << endl;
 
         if (b.val % gcd_)
         {
@@ -358,10 +357,10 @@ private:
 
     static uint64_t pollardRhoHelper(ModuloNumber a, ModuloNumber A, ModuloNumber b, ModuloNumber B, const ModuloNumber& x,const ModuloNumber& base)
     {
-        cout << string(B - b) << ' ' << string(a - A) << endl;
+        //cout << string(B - b) << ' ' << string(a - A) << endl;
         auto res = solveLinearEquation(B - b, a - A);
 
-        cout << "solution is " << string(res.first) << endl;
+        //cout << "solution is " << string(res.first) << endl;
 
         if (res.second == 1)
         {
@@ -377,7 +376,7 @@ private:
         }
 
         uint64_t step = a.modulo / res.second;
-        cout << "step " << step << endl;
+        //cout << "step " << step << endl;
         auto mul = base.pow(step);
 
         for(uint64_t i = 0; i < res.second - 1; i++)
@@ -385,7 +384,7 @@ private:
             pow_ *= mul;
             degree_ += step;
 
-            cout << "degree candidate " << degree_ << endl;
+            //cout << "degree candidate " << degree_ << endl;
 
             if (pow_ == x)
             {
@@ -424,11 +423,6 @@ public:
 
         return 0;
     }
-
-private:
-
-    static random_device rd;
-    static default_random_engine generator;
 
     static uint64_t random64(uint64_t from, uint64_t to)
     {
@@ -523,11 +517,12 @@ private:
         {
             uint64_t prime_candidate = 0;
 
+            do
             {
                 prime_candidate = randomBits(bit_number, true);
 
             }
-            while (!must_2_over_3 || prime_candidate % 3 == 2);
+            while (!must_2_over_3 || prime_candidate % 3 != 2);
 
             if (isTriviallyComposite(prime_candidate) || isMillerTestComposite(prime_candidate, attempts))
             {
@@ -559,6 +554,94 @@ private:
 
         return false;
     };
+
+private:
+    static random_device rd;
+    static default_random_engine generator;
+};
+
+
+random_device PrimeRandomGenerator::rd;
+default_random_engine PrimeRandomGenerator::generator(rd());
+
+class Measurer
+{
+public:
+    static void genAndMeasureDLog(uint8_t from_bits, uint8_t to_bits, uint8_t bit_step = 1 , uint64_t upper_limit = 600000, uint8_t modulosCount = 3, uint8_t xCount = 3)
+    {
+        if (from_bits >= to_bits || from_bits < 10 || to_bits >= 63 || !bit_step)
+        {
+            throw invalid_argument("Give valid limits");
+        }
+
+        vector<uint64_t> naive, baby, pollard;
+
+        for (uint8_t count = from_bits; count < to_bits; count++)
+        {
+            genAndMeasureDLog(count, naive, baby, pollard, modulosCount, xCount);
+        }
+
+        printArray("naive", naive);
+        printArray("baby", baby);
+        printArray("pollard", pollard);
+
+    }
+private:
+
+    static void printArray(string label, vector<uint64_t> data)
+    {
+        cout << label << "_list = [";
+
+        for (const auto& val: data)
+        {
+            cout << val << ", ";
+        }
+
+        cout << "]" << endl;
+    }
+
+    static void genAndMeasureDLog(uint8_t bit_number, vector<uint64_t>& naive, vector<uint64_t>& baby, vector<uint64_t>& pollard, uint8_t modulosCount = 3, uint8_t xCount = 3)
+    {
+        for (uint8_t i = 0; i < modulosCount; i++)
+        {
+            auto p = PrimeRandomGenerator::genSafePrime(bit_number);
+            ModuloNumber base(ModuloNumber::generatorForSafePrime(p), p);
+
+            for (uint8_t j = 0; j < xCount; j++)
+            {
+                ModuloNumber x(PrimeRandomGenerator::random64(2, p - 2), p);
+
+                measureDLog(x, base, naive, baby, pollard);
+            }
+        }
+    }
+
+    static void measureDLog(const ModuloNumber& x,const ModuloNumber& base, vector<uint64_t>& naive, vector<uint64_t>& baby, vector<uint64_t>& pollard)
+    {
+        naive.push_back(measureDLog(x, base, &ModuloNumber::naiveLog));
+        baby.push_back(measureDLog(x, base, &ModuloNumber::babyStepGiantStepLog));
+        pollard.push_back(measureDLog(x, base, &ModuloNumber::pollardRhoLog));
+    }
+
+
+    static uint64_t measureDLog(const ModuloNumber& x,const ModuloNumber& base, uint64_t (*f)(const ModuloNumber& x,const ModuloNumber& base))
+    {
+        if (!f)
+        {
+            throw invalid_argument("Should be a valid pointer here");
+        }
+
+        auto start = std::chrono::high_resolution_clock::now();
+        uint64_t degree = f(x, base);
+        auto stop = std::chrono::high_resolution_clock::now();
+
+        if (x != base.pow(degree))
+        {
+            throw runtime_error("An algorithm works incorrectly!");
+        }
+
+        return  std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+    }
 };
 
 
@@ -708,6 +791,8 @@ void check_Carmichael_number(uint64_t modulo)
 int main()
 {
 
+    Measurer::genAndMeasureDLog(36, 40);
+
     //cout << pollard_rho_log(3973579837, 7, 8227912079) << endl;
    // uint64_t correct_degree = log_baby_step_giant_step(3973579837, 7, 8227912079);
     //cout << "correct degree " <<  correct_degree << endl;
@@ -717,7 +802,7 @@ int main()
     // return 0;
     //check_Carmichael_number(41041);
 
-    ModuloNumber::generateAndMeasure(48);
+    //ModuloNumber::generateAndMeasure(48);
 
 
 

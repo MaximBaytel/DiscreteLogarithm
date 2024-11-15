@@ -526,32 +526,98 @@ default_random_engine PrimeRandomGenerator::generator(rd());
 class Measurer
 {
 public:
-    static void genAndMeasureDLog(uint8_t from_bits, uint8_t to_bits, uint8_t bit_step = 1, uint8_t modulosCount = 3, uint8_t xCount = 3)
+    using LogFunction = uint64_t (*)(const ModuloNumber& x,const ModuloNumber& base);
+    using MeasureResult = pair<vector<uint8_t>, vector<uint64_t>>;
+
+    static void genAndMeasureDLog(uint8_t from_bits, uint8_t to_bits, uint8_t bit_step = 1, uint8_t modulosCount = 3, uint8_t xCount = 3, uint64_t noMoreThanMillli = 30000)
     {
         if (from_bits >= to_bits || from_bits < 10 || to_bits >= 63 || !bit_step)
         {
             throw invalid_argument("Give valid limits");
         }
 
-        vector<uint64_t> naive, baby, pollard;
+        vector<pair<uint8_t,uint64_t>> naive, baby, pollard;
+        bool stopNaive = false, stopBaby = false, stopPollard = false;
 
         for (uint8_t count = from_bits; count < to_bits; count++)
         {
-            genAndMeasureDLog(count, naive, baby, pollard, modulosCount, xCount);
+            auto res = genAndMeasureDLog(count,
+                                         stopNaive ? nullptr : &ModuloNumber::naiveLog,
+                                         stopBaby ? nullptr : &ModuloNumber::babyStepGiantStepLog,
+                                         stopPollard ? nullptr : &ModuloNumber::pollardRhoLog,
+                                         modulosCount, xCount);
+
+            auto naiveVal = get<0>(res);
+            auto babyVal = get<1>(res);
+            auto pollardVal = get<2>(res);
+
+            if (naiveVal)
+            {
+                naive.push_back({count, naiveVal});
+                stopNaive = naiveVal > noMoreThanMillli;
+            }
+
+            if (babyVal)
+            {
+                baby.push_back({count, babyVal});
+                stopBaby = babyVal > noMoreThanMillli;
+            }
+
+            if (pollardVal)
+            {
+                pollard.push_back({count, pollardVal});
+                stopPollard = pollardVal > noMoreThanMillli;
+            }
         }
 
-        printArray("naive", naive);
-        printArray("baby", baby);
-        printArray("pollard", pollard);
+        printArray("naive", convertHelper(naive));
+        printArray("baby", convertHelper(baby));
+        printArray("pollard", convertHelper(pollard));
 
     }
 private:
 
-    static void printArray(string label, vector<uint64_t> data)
+    static uint64_t average(const vector<uint64_t>& v)
     {
-        cout << label << "_list = [";
+        if (v.empty())
+        {
+            return 0;
+        }
 
-        for (const auto& val: data)
+        return reduce(v.begin(), v.end()) / v.size();
+    }
+
+    static MeasureResult convertHelper(const vector<pair<uint8_t,uint64_t>>& v)
+    {
+        vector<uint8_t> x;
+        vector<uint64_t> y;
+
+        x.reserve(v.size());
+        y.reserve(v.size());
+
+        for (const auto& p: v)
+        {
+            x.push_back(p.first);
+            y.push_back(p.second);
+        }
+
+        return {x, y};
+    }
+
+    static void printArray(string label, const MeasureResult& data)
+    {
+        cout << label << "_list_x = [";
+
+        for (const auto& val: data.first)
+        {
+            cout << (uint16_t)val << ", ";
+        }
+
+        cout << "]" << endl;
+
+        cout << label << "_list_y = [";
+
+        for (const auto& val: data.second)
         {
             cout << val << ", ";
         }
@@ -559,8 +625,10 @@ private:
         cout << "]" << endl;
     }
 
-    static void genAndMeasureDLog(uint8_t bit_number, vector<uint64_t>& naive, vector<uint64_t>& baby, vector<uint64_t>& pollard, uint8_t modulosCount = 3, uint8_t xCount = 3)
+    static tuple<uint64_t, uint64_t, uint64_t> genAndMeasureDLog(uint8_t bit_number, LogFunction naiveF, LogFunction babyF, LogFunction pollardF, uint8_t modulosCount, uint8_t xCount)
     {
+        vector<uint64_t> naive, baby, pollard;
+
         for (uint8_t i = 0; i < modulosCount; i++)
         {
             auto p = PrimeRandomGenerator::genSafePrime(bit_number);
@@ -570,20 +638,29 @@ private:
             {
                 ModuloNumber x(PrimeRandomGenerator::random64(2, p - 2), p);
 
-                measureDLog(x, base, naive, baby, pollard);
+                if (naiveF)
+                {
+                    naive.push_back(measureDLog(x, base, naiveF));
+                }
+
+                if (babyF)
+                {
+                    baby.push_back(measureDLog(x, base, babyF));
+                }
+
+                if (pollardF)
+                {
+                    pollard.push_back(measureDLog(x, base, pollardF));
+                }
             }
         }
-    }
 
-    static void measureDLog(const ModuloNumber& x,const ModuloNumber& base, vector<uint64_t>& naive, vector<uint64_t>& baby, vector<uint64_t>& pollard)
-    {
-        naive.push_back(measureDLog(x, base, &ModuloNumber::naiveLog));
-        baby.push_back(measureDLog(x, base, &ModuloNumber::babyStepGiantStepLog));
-        pollard.push_back(measureDLog(x, base, &ModuloNumber::pollardRhoLog));
+        return {average(naive), average(baby), average(pollard)};
+
     }
 
 
-    static uint64_t measureDLog(const ModuloNumber& x,const ModuloNumber& base, uint64_t (*f)(const ModuloNumber& x,const ModuloNumber& base))
+    static uint64_t measureDLog(const ModuloNumber& x,const ModuloNumber& base, LogFunction f)
     {
         if (!f)
         {
@@ -749,9 +826,10 @@ void check_Carmichael_number(uint64_t modulo)
 
 int main()
 {
-    Measurer::genAndMeasureDLog(36, 40);
+    //Measurer::genAndMeasureDLog(36, 40);
+    Measurer::genAndMeasureDLog(40, 45);
 
-    // print_a_x(17);
+    // print_a_in_x(17);
     // print_a_in_x(21);
     // print_a_in_x(23);
 

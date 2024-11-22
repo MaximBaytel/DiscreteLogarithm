@@ -32,7 +32,7 @@ public:
         return val;
     }
 
-    const uint64_t modulos() const
+    uint64_t modulos() const
     {
         return modulo;
     }
@@ -265,7 +265,7 @@ public:
 
         uint64_t n = base.modulo - 1;
 
-        auto new_xab = [x, base, n](ModuloNumber& x_, ModuloNumber& a, ModuloNumber& b)
+        auto new_xab = [x, base](ModuloNumber& x_, ModuloNumber& a, ModuloNumber& b)
         {
             switch (x_.val % 3)
             {
@@ -547,7 +547,7 @@ private:
 
 
 random_device PrimeRandomGenerator::rd;
-default_random_engine PrimeRandomGenerator::generator(rd());
+default_random_engine PrimeRandomGenerator::generator(42);
 
 class Measurer
 {
@@ -608,6 +608,12 @@ public:
                 {
                     cout << "\033[31mstopping pollard...\033[0m" << endl;
                 }
+            }
+
+            if (stopNaive && stopBaby && stopPollard)
+            {
+                cout << "\033[31mall the algorithms stopped...\033[0m" << endl;
+                break;
             }
         }
 
@@ -784,7 +790,7 @@ private:
         return res;
     }
 
-    static int8_t log_int(uint64_t x, uint32_t base)
+    static int8_t  log_int(uint64_t x, uint32_t base)
     {
         if (base > x || !base)
         {
@@ -855,10 +861,10 @@ private:
         }
         uint8_t digits_count = std::to_string(modulo).length();
 
-        for (int i = 1; i < modulo; i++)
+        for (unsigned int i = 1; i < modulo; i++)
         {
             cout << "degree = " << std::setw(digits_count) << i << " |";
-            for (int j = 1; j < modulo; j++)
+            for (unsigned int j = 1; j < modulo; j++)
             {
                 cout << ' ' << std::setw(digits_count) << uint64_t(ModuloNumber(j, modulo).pow(i)) << " |";
             }

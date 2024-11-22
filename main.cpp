@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -293,6 +294,7 @@ public:
     }
 
 private:
+    // used in solving of a linear congruence
     ModuloNumber operator /= (uint64_t d)
     {
         if (!d)
@@ -306,7 +308,7 @@ private:
         return *this;
     }
 
-    static uint64_t gcd(int64_t a, int64_t b, int64_t& x, int64_t& y)
+    static uint64_t extendedGcd(int64_t a, int64_t b, int64_t& x, int64_t& y)
     {
         x = 1, y = 0;
         int64_t x1 = 0, y1 = 1, a1 = a, b1 = b;
@@ -341,7 +343,7 @@ private:
 
 
         int64_t x = 0, y = 0;
-        gcd(a.val, a.modulo, x, y);
+        extendedGcd(a.val, a.modulo, x, y);
 
         return make_pair(ModuloNumber(x >= 0 ? x : x + a.modulos(), a.modulos()) * b, gcd_);
     }
@@ -526,7 +528,7 @@ public:
 
             if (a.pow(prime_candidate - 1) != 1)
             {
-                continue;
+                return false;
             }
 
             if (gcd(uint64_t(a * a) - 1, prime_candidate) == 1)
@@ -582,7 +584,7 @@ public:
 
                 if (stopNaive)
                 {
-                    cout << "stopping naive..." << endl;
+                    cout << "\033[31m stopping naive...\033[0m" << endl;
                 }
             }
 
@@ -593,7 +595,7 @@ public:
 
                 if (stopBaby)
                 {
-                    cout << "stopping baby..." << endl;
+                    cout << "\033[31m stopping baby...\033[0m" << endl;
                 }
             }
 
@@ -604,7 +606,7 @@ public:
 
                 if (stopPollard)
                 {
-                    cout << "stopping pollard..." << endl;
+                    cout << "\033[31mstopping pollard...\033[0m" << endl;
                 }
             }
         }
@@ -730,186 +732,199 @@ private:
 };
 
 
-uint64_t pow_int(uint32_t base, uint8_t degree)
+class Examples
 {
-    if (base == 0)
+public:
+    static void Run()
     {
-        return 0;
-    }
-    if (base == 1 || degree == 0)
-    {
-        return 1;
+        cout << "2^10 = " << pow_int(2, 10) << endl
+             << "3^4 =" << pow_int(3, 4) << endl;
+
+        cout << "log(1024) by 2 " << uint16_t(log_int(1024, 2))  << endl
+             << "log(81) by 3 " << uint16_t(log_int(81, 3)) << endl;
+
+        cout << endl << endl;
+
+        print_a_in_x(17);
+
+        cout << endl << endl;
+
+        print_a_in_x(10);
+
+        check_Carmichael_number(561);
     }
 
-    uint64_t res = 1;
-    uint64_t curr = base;
+private:
 
-    while (degree)
+    static uint64_t pow_int(uint32_t base, uint8_t degree)
     {
-        if (degree & 0x1)
+        if (base == 0)
         {
-            res *= curr;
+            return 0;
+        }
+        if (base == 1 || degree == 0)
+        {
+            return 1;
         }
 
-        degree /= 2;
-        curr *= curr;
+        uint64_t res = 1;
+        uint64_t curr = base;
+
+        while (degree)
+        {
+            if (degree & 0x1)
+            {
+                res *= curr;
+            }
+
+            degree /= 2;
+            curr *= curr;
+        }
+
+        return res;
     }
 
-    return res;
-}
+    static int8_t log_int(uint64_t x, uint32_t base)
+    {
+        if (base > x || !base)
+        {
+            return -1;
+        }
 
-int8_t log_int(uint64_t x, uint32_t base)
+        if (x == 1)
+        {
+            return 0;
+        }
+
+        if (base == 1)
+        {
+            return -1;
+        }
+
+        //can be used as some simplification and so on...but not our aim here to implement fast log_int
+        // if (base == 2)
+        // {
+        //     return 63 - __builtin_clzll(x);
+        // }
+
+        vector<uint64_t> powers;
+        powers.reserve(64);
+        uint64_t curr = base;
+
+        while (true)
+        {
+            powers.push_back(curr);
+
+            if (curr > std::numeric_limits<uint32_t>::max())
+                break;
+
+            curr *= curr;
+        }
+
+        uint8_t res = 0;
+
+        auto it = powers.rbegin();
+        int i = 1;
+
+        while (it != powers.rend())
+        {
+            auto curr = *it;
+
+            if (x == curr)
+            {
+                return res + (1 << (powers.size() - i));
+            }
+
+            if (x > curr)
+            {
+                x /= curr;
+                res += 1 << (powers.size() - i);
+            }
+
+            i++, it++;
+        }
+
+        return res;
+    }
+
+    static void print_a_in_x(uint64_t modulo)
+    {
+        if (modulo <= 2)
+        {
+            throw underflow_error("please use something more meaningful here");
+        }
+        uint8_t digits_count = std::to_string(modulo).length();
+
+        for (int i = 1; i < modulo; i++)
+        {
+            cout << "degree = " << std::setw(digits_count) << i << " |";
+            for (int j = 1; j < modulo; j++)
+            {
+                cout << ' ' << std::setw(digits_count) << uint64_t(ModuloNumber(j, modulo).pow(i)) << " |";
+            }
+            cout << endl;
+        }
+    }
+
+
+    static void check_Carmichael_number(uint64_t modulo)
+    {
+        uint64_t half_degree = (modulo - 1) / 2;
+
+        bool all_is_one = true;
+        bool some_half_degrees_arent = false;
+
+        for (uint64_t i = 3; i < modulo; i++)
+        {
+            if (gcd(i, modulo) != 1)
+            {
+                continue;
+            }
+
+            auto res = ModuloNumber(i, modulo).pow(half_degree);
+
+            some_half_degrees_arent |= (res != 1) && (res != modulo - 1);
+
+            if ((res != 1) && (res != modulo - 1))
+            {
+                cout << "some aren't" << endl;
+            }
+
+            res *= res;
+
+            all_is_one &= (res == 1);
+        }
+
+        cout << "all the coprime numbers satisfy the little Fermat's theorem ? " << all_is_one
+             << endl << " but some half degrees are neither +1 nor -1 ? " << some_half_degrees_arent << endl;
+    }
+
+};
+
+int main(int argc, char* argv[])
 {
-    if (base > x || !base)
+    bool measureIt = false;
+    bool showExamples = false;
+
+    if (argc > 1)
     {
-        return -1;
+        measureIt = !strcmp(argv[1],"--measure");
+        showExamples = !strcmp(argv[1],"--examples");
     }
 
-    if (x == 1)
+    if (measureIt)
     {
-        return 0;
+        Measurer::genAndMeasureDLog(16, 60);
     }
-
-    if (base == 1)
+    else if (showExamples)
     {
-        return -1;
+        Examples::Run();
     }
-
-    //can be used as some simplification and so on...but not our aim here to implement fast log_int
-    // if (base == 2)
-    // {
-    //     return 63 - __builtin_clzll(x);
-    // }
-
-    vector<uint64_t> powers;
-    powers.reserve(64);
-    uint64_t curr = base;
-
-    while (true)
+    else
     {
-        powers.push_back(curr);
-
-        if (curr > std::numeric_limits<uint32_t>::max())
-            break;
-
-        curr *= curr;
+        cout << endl << argv[0] << " use -- measure to measure it"
+             << endl << "use --examples to show some examples" << endl;
     }
-
-    uint8_t res = 0;
-
-    auto it = powers.rbegin();
-    int i = 1;
-
-    while (it != powers.rend())
-    {
-        auto curr = *it;
-
-        if (x == curr)
-        {
-            return res + (1 << (powers.size() - i));
-        }
-
-        if (x > curr)
-        {
-            x /= curr;
-            res += 1 << (powers.size() - i);
-        }
-
-        i++, it++;
-    }
-
-    return res;
-}
-
-void print_a_in_x(uint64_t modulo)
-{
-    if (modulo <= 2)
-    {
-        throw underflow_error("please use something more meaningful here");
-    }
-    uint8_t digits_count = std::to_string(modulo).length();
-
-    for (int i = 1; i < modulo; i++)
-    {
-        cout << "degree = " << std::setw(digits_count) << i << " |";
-        for (int j = 1; j < modulo; j++)
-        {
-            cout << ' ' << std::setw(digits_count) << uint64_t(ModuloNumber(j, modulo).pow(i)) << " |";
-        }
-        cout << endl;
-    }
-}
-
-
-void check_Carmichael_number(uint64_t modulo)
-{
-    uint64_t half_degree = (modulo - 1) / 2;
-
-    bool all_is_one = true;
-    bool some_half_degrees_arent = false;
-
-    for (uint64_t i = 3; i < modulo; i++)
-    {
-        if (gcd(i, modulo) != 1)
-        {
-            continue;
-        }
-
-        auto res = ModuloNumber(i, modulo).pow(half_degree);
-
-        some_half_degrees_arent |= (res != 1) && (res != modulo - 1);
-
-        if ((res != 1) && (res != modulo - 1))
-        {
-            cout << "some aren't" << endl;
-        }
-
-        res *= res;
-
-        all_is_one &= (res == 1);
-    }
-
-    cout << "all the coprime numbers satisfy the little Fermat's theorem ? " << all_is_one
-         << endl << " but some half degrees are neither +1 nor -1 ? " << some_half_degrees_arent << endl;
-}
-
-
-int main()
-{
-    //cout << ModuloNumber::pollardRhoLog(ModuloNumber(42928, 122663), ModuloNumber(5, 122663)) << endl;
-    //Measurer::genAndMeasureDLog(36, 40);
-    Measurer::genAndMeasureDLog(16, 40);
-
-    // print_a_in_x(17);An algorithm works incorrectly!
-    // print_a_in_x(21);
-    // print_a_in_x(23);
-
-
-    // cout << "Let's show integer_log correctness" << endl;
-
-    // for (uint64_t base = 2; base <= std::numeric_limits<uint32_t>::max(); base++)
-    // {
-    //     uint64_t pow = base;
-
-    //     for(uint8_t degree = 1; degree <= 63; degree++)
-    //     {
-    //         if (degree != integer_log(pow, base))
-    //         {
-    //             cout << "panic! " << (uint16_t)degree << " " << (uint16_t)integer_log(pow, base) << endl;
-    //         }
-
-    //         //filter overflow results here
-    //         if (pow > std::numeric_limits<uint64_t>::max() / pow)
-    //         {
-    //             break;
-    //         }
-    //         pow *= base;
-    //     }
-
-    //     if (!(base % 10000000))
-    //         cout << "done for base less or equal " << base << endl;
-    // }
-
 
     return 0;
 }

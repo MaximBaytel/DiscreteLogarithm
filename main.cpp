@@ -31,6 +31,11 @@ public:
         return val;
     }
 
+    const uint64_t modulos() const
+    {
+        return modulo;
+    }
+
     bool operator == (const ModuloNumber& x) const
     {
         return val == x.val && modulo == x.modulo;
@@ -58,6 +63,13 @@ public:
             throw invalid_argument("Consider explicit conversion here");
         }
 
+        uint64_t intermediate = val + x.val;
+
+        if (intermediate >= val)
+        {
+            return ModuloNumber(intermediate, modulo);
+        }
+
         // - modulo here is to prevent overflow for large modulos
         // from the "modular" point of view any +- k * m operation don't change anything
         return ModuloNumber(val - modulo + x.val, modulo);
@@ -81,7 +93,10 @@ public:
             throw invalid_argument("Consider explicit conversion here");
         }
 
-        return ModuloNumber(val - x.val + modulo, modulo);
+        if ( val >= x.val )
+            return ModuloNumber(val - x.val, modulo);
+
+        return ModuloNumber(modulo - x.val + val, modulo);
     }
 
     ModuloNumber& operator -= (const ModuloNumber& x)
@@ -136,7 +151,7 @@ public:
 
         while (degree)
         {
-            if (degree & 0x1)
+            if (degree & 1)
             {
                 res *= curr;
             }
@@ -146,15 +161,6 @@ public:
         }
 
         return res;
-    }
-
-    ModuloNumber inverse() const
-    {
-        // please notice that it's a Fermat inversion here
-        // it won't work in general case if modulo isn't a prime
-        // but for obvious reasons here we don't check it
-
-        return pow(modulo - 2);
     }
 
     // it works as it's written for modulos which are 2p + 1
@@ -293,7 +299,18 @@ private:
         return *this;
     }
 
-    // Look! this approach isn't general, it works because modulo is 2 * p
+    static uint64_t gcd(int64_t a, int64_t b, int64_t& x, int64_t& y) {
+        x = 1, y = 0;
+        int64_t x1 = 0, y1 = 1, a1 = a, b1 = b;
+        while (b1) {
+            int64_t q = a1 / b1;
+            tie(x, x1) = make_tuple(x1, x - q * x1);
+            tie(y, y1) = make_tuple(y1, y - q * y1);
+            tie(a1, b1) = make_tuple(b1, a1 - q * b1);
+        }
+        return a1;
+    }
+
     static pair<ModuloNumber, uint64_t> solveLinearEquation(ModuloNumber a, ModuloNumber b)
     {
         if (a.modulo != b.modulo)
@@ -303,7 +320,7 @@ private:
 
         //cout << "solving " << a.val << "*x = " << b.val << " mod " << a.modulo << endl;
 
-        uint64_t gcd_ = gcd(a.val, b.modulo);
+        uint64_t gcd_ = std::gcd(a.val, a.modulo);
 
         //cout << "gcd = " << gcd_ << endl;
 
@@ -315,8 +332,11 @@ private:
         a /= gcd_;
         b /= gcd_;
 
-        return make_pair(a.inverse() * b, gcd_);
 
+        int64_t x = 0, y = 0;
+        gcd(a.val, a.modulo, x, y);
+
+        return make_pair(ModuloNumber(x >= 0 ? x : x + a.modulos(), a.modulos()) * b, gcd_);
     }
 
     static uint64_t pollardRhoHelper(ModuloNumber a, ModuloNumber A, ModuloNumber b, ModuloNumber B, const ModuloNumber& x,const ModuloNumber& base)
@@ -324,32 +344,30 @@ private:
         //cout << string(B - b) << ' ' << string(a - A) << endl;
         auto res = solveLinearEquation(B - b, a - A);
 
-        //cout << "solution is " << string(res.first) << endl;
-
         if (res.second == 1)
         {
             return res.first.val;
         }
 
-        uint64_t degree_ = res.first.val;
-        auto pow_ = base.pow(degree_);
+        auto degree_ = ModuloNumber(res.first.val, a.modulos());
+        auto pow_ = base.pow(uint64_t(degree_));
 
         if (pow_ == x)
         {
-            return degree_;
+            return uint64_t(degree_);
         }
 
-        uint64_t step = a.modulo / res.second;
+        const uint64_t step = a.modulo / res.second;
         auto mul = base.pow(step);
 
-        for(uint64_t i = 0; i < res.second - 1; i++)
+        for(uint64_t i = 0; i <= res.second - 1; i++)
         {
             pow_ *= mul;
             degree_ += step;
 
             if (pow_ == x)
             {
-                return degree_;
+                return uint64_t(degree_);
             }
         }
 
@@ -385,7 +403,7 @@ public:
 
     static uint64_t random64(uint64_t from, uint64_t to)
     {
-        static uniform_int_distribution<long long unsigned> distribution(from,to);
+        uniform_int_distribution<uint64_t> distribution(from,to);
 
         return distribution(generator);
     }
@@ -629,10 +647,14 @@ private:
     {
         vector<uint64_t> naive, baby, pollard;
 
+        cout << "bit_number = " << uint16_t(bit_number) << " starting..." << endl;
+
         for (uint8_t i = 0; i < modulosCount; i++)
         {
             auto p = PrimeRandomGenerator::genSafePrime(bit_number);
             ModuloNumber base(ModuloNumber::generatorForSafePrime(p), p);
+
+            cout << uint16_t(i) << "st modulo starting..." << endl;
 
             for (uint8_t j = 0; j < xCount; j++)
             {
@@ -640,40 +662,46 @@ private:
 
                 if (naiveF)
                 {
-                    naive.push_back(measureDLog(x, base, naiveF));
+                    naive.push_back(measureDLog(x, base, naiveF, "naive"));
                 }
 
                 if (babyF)
                 {
-                    baby.push_back(measureDLog(x, base, babyF));
+                    baby.push_back(measureDLog(x, base, babyF, "baby"));
                 }
 
                 if (pollardF)
                 {
-                    pollard.push_back(measureDLog(x, base, pollardF));
+                    pollard.push_back(measureDLog(x, base, pollardF, "pollard"));
                 }
             }
+
+            cout << uint16_t(i) << "st modulo finishing..." << endl;
         }
 
-        return {average(naive), average(baby), average(pollard)};
+        cout << "bit_number = " << uint16_t(bit_number) << " finishing..." << endl;
 
+        return {average(naive), average(baby), average(pollard)};
     }
 
 
-    static uint64_t measureDLog(const ModuloNumber& x,const ModuloNumber& base, LogFunction f)
+    static uint64_t measureDLog(const ModuloNumber& x,const ModuloNumber& base, LogFunction f, const string& label)
     {
         if (!f)
         {
-            throw invalid_argument("Should be a valid pointer here");
+            throw invalid_argument("Should be a valid pointer here " + label);
         }
 
         auto start = std::chrono::high_resolution_clock::now();
         uint64_t degree = f(x, base);
         auto stop = std::chrono::high_resolution_clock::now();
+        auto base_in_x = base.pow(degree);
 
-        if (x != base.pow(degree))
+        if (x != base_in_x)
         {
-            throw runtime_error("An algorithm works incorrectly!");
+            throw runtime_error("An algorithm works incorrectly! " + label + " base = " + to_string(uint64_t(base))
+                                + ", x = " + to_string(uint64_t(x)) + ", modulo = " + to_string(base.modulos())
+                                + ", degree = " + to_string(degree));
         }
 
         return  std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
@@ -826,10 +854,11 @@ void check_Carmichael_number(uint64_t modulo)
 
 int main()
 {
+    //cout << ModuloNumber::pollardRhoLog(ModuloNumber(42928, 122663), ModuloNumber(5, 122663)) << endl;
     //Measurer::genAndMeasureDLog(36, 40);
-    Measurer::genAndMeasureDLog(40, 45);
+    Measurer::genAndMeasureDLog(16, 60);
 
-    // print_a_in_x(17);
+    // print_a_in_x(17);An algorithm works incorrectly!
     // print_a_in_x(21);
     // print_a_in_x(23);
 

@@ -94,8 +94,11 @@ public:
         }
 
         if ( val >= x.val )
+        {
             return ModuloNumber(val - x.val, modulo);
+        }
 
+        // underflow case here
         return ModuloNumber(modulo - x.val + val, modulo);
     }
 
@@ -117,6 +120,8 @@ public:
             throw invalid_argument("Consider explicit conversion here");
         }
 
+        // unfortunately it's essential to multiply numbers whose intermediate value overflows 64 bits
+        // the simplest but arguing way to do it is to use 128 bits numbers
         return ModuloNumber((uint128_t(val) * uint128_t(x.val)) % modulo, modulo);
     }
 
@@ -132,6 +137,7 @@ public:
     }
 
     // Division not each time is possible and not required
+    // let's use this operator privately doing something else, for convenience
     //ModuloNumber operator / (const ModuloNumber& x) const
 
     ModuloNumber pow(uint64_t degree) const
@@ -164,6 +170,7 @@ public:
     }
 
     // it works as it's written for modulos which are 2p + 1
+    // it won't work for not safe primes
     static uint64_t generatorForSafePrime(uint64_t modulo)
     {
         for (uint64_t i = 2; i < modulo - 1; i++)
@@ -299,15 +306,19 @@ private:
         return *this;
     }
 
-    static uint64_t gcd(int64_t a, int64_t b, int64_t& x, int64_t& y) {
+    static uint64_t gcd(int64_t a, int64_t b, int64_t& x, int64_t& y)
+    {
         x = 1, y = 0;
         int64_t x1 = 0, y1 = 1, a1 = a, b1 = b;
-        while (b1) {
+
+        while (b1)
+        {
             int64_t q = a1 / b1;
             tie(x, x1) = make_tuple(x1, x - q * x1);
             tie(y, y1) = make_tuple(y1, y - q * y1);
             tie(a1, b1) = make_tuple(b1, a1 - q * b1);
         }
+
         return a1;
     }
 
@@ -318,11 +329,7 @@ private:
             throw invalid_argument("Consider explicit conversion here");
         }
 
-        //cout << "solving " << a.val << "*x = " << b.val << " mod " << a.modulo << endl;
-
         uint64_t gcd_ = std::gcd(a.val, a.modulo);
-
-        //cout << "gcd = " << gcd_ << endl;
 
         if (b.val % gcd_)
         {
@@ -341,7 +348,6 @@ private:
 
     static uint64_t pollardRhoHelper(ModuloNumber a, ModuloNumber A, ModuloNumber b, ModuloNumber B, const ModuloNumber& x,const ModuloNumber& base)
     {
-        //cout << string(B - b) << ' ' << string(a - A) << endl;
         auto res = solveLinearEquation(B - b, a - A);
 
         if (res.second == 1)
@@ -410,7 +416,7 @@ public:
 
     static uint64_t randomBits(uint8_t bit_number, bool odd = true)
     {
-        uint64_t res = random64(1ULL << bit_number, (1ULL << (bit_number + 1)) - 1);
+        uint64_t res = random64(1ULL << (bit_number - 1), ((1ULL << bit_number) - 1));
 
         if (odd && !(res % 2))
             res += 1;
@@ -573,18 +579,33 @@ public:
             {
                 naive.push_back({count, naiveVal});
                 stopNaive = naiveVal > noMoreThanMillli;
+
+                if (stopNaive)
+                {
+                    cout << "stopping naive..." << endl;
+                }
             }
 
             if (babyVal)
             {
                 baby.push_back({count, babyVal});
                 stopBaby = babyVal > noMoreThanMillli;
+
+                if (stopBaby)
+                {
+                    cout << "stopping baby..." << endl;
+                }
             }
 
             if (pollardVal)
             {
                 pollard.push_back({count, pollardVal});
                 stopPollard = pollardVal > noMoreThanMillli;
+
+                if (stopPollard)
+                {
+                    cout << "stopping pollard..." << endl;
+                }
             }
         }
 
@@ -754,6 +775,7 @@ int8_t log_int(uint64_t x, uint32_t base)
         return -1;
     }
 
+    //can be used as some simplification and so on...but not our aim here to implement fast log_int
     // if (base == 2)
     // {
     //     return 63 - __builtin_clzll(x);
@@ -803,7 +825,7 @@ void print_a_in_x(uint64_t modulo)
 {
     if (modulo <= 2)
     {
-        throw underflow_error("please use something more meaningful");
+        throw underflow_error("please use something more meaningful here");
     }
     uint8_t digits_count = std::to_string(modulo).length();
 
@@ -839,7 +861,7 @@ void check_Carmichael_number(uint64_t modulo)
 
         if ((res != 1) && (res != modulo - 1))
         {
-            cout << "some" << endl;
+            cout << "some aren't" << endl;
         }
 
         res *= res;
@@ -856,7 +878,7 @@ int main()
 {
     //cout << ModuloNumber::pollardRhoLog(ModuloNumber(42928, 122663), ModuloNumber(5, 122663)) << endl;
     //Measurer::genAndMeasureDLog(36, 40);
-    Measurer::genAndMeasureDLog(16, 60);
+    Measurer::genAndMeasureDLog(16, 40);
 
     // print_a_in_x(17);An algorithm works incorrectly!
     // print_a_in_x(21);
